@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鹈鹕快鞭</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one centered stage — title, live stat strip, 16:9 scene, then a control deck (big whip button + settings) that stacks on phones */
+:root{
+  --bg:#edf1f3; --surface:#ffffff; --chip:#e1e8ec; --fg:#1a2730; --muted:#5a6b75; --line:#d2dbe0;
+  --accent:#e5821a; --accent-ink:#ffffff; --accent-soft:#fbe6cf;
+  --f-display:"ZCOOL KuaiLe","Noto Sans SC",system-ui,sans-serif;
+  --f-body:"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11171b; --surface:#192228; --chip:#222d34; --fg:#e4ebef; --muted:#93a4ae; --line:#2b373f;
+    --accent:#f29a3a; --accent-ink:#1d1206; --accent-soft:#3a2a17; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11171b; --surface:#192228; --chip:#222d34; --fg:#e4ebef; --muted:#93a4ae; --line:#2b373f;
+  --accent:#f29a3a; --accent-ink:#1d1206; --accent-soft:#3a2a17; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:15px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:22px 36px;
+}
+.wrap{max-width:980px; margin:0 auto; display:grid; gap:14px}
+header{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px}
+h1{font-family:var(--f-display); font-weight:400; font-size:42px; line-height:1.1; margin:0; letter-spacing:.02em; text-wrap:balance}
+h1 span{color:var(--accent)}
+header p{margin:0; color:var(--muted); max-width:60ch; min-width:0}
+
+.hud{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.stat{background:var(--surface); padding:9px 14px; display:grid; gap:0}
+.stat .k{font-size:12px; color:var(--muted); letter-spacing:.06em}
+.stat .v{font-family:var(--f-mono); font-weight:600; font-size:24px; font-variant-numeric:tabular-nums; line-height:1.3}
+.stat .v small{font-size:13px; color:var(--muted); font-weight:500; margin-left:3px}
+.stat.hot .v{color:var(--accent)}
+
+.stage{border-radius:14px; overflow:hidden; border:1px solid var(--line); background:#8fcff5; line-height:0}
+#scene{display:block; width:100%; max-width:100%; aspect-ratio:16/9; height:auto; cursor:pointer; touch-action:manipulation; user-select:none; -webkit-user-select:none}
+
+.deck{display:grid; grid-template-columns:minmax(170px,230px) minmax(0,1fr); gap:14px}
+#whipBtn{
+  font-family:var(--f-display); font-size:34px; color:var(--accent-ink); background:var(--accent);
+  border:none; border-radius:14px; cursor:pointer; min-height:130px; display:grid; place-content:center; gap:6px;
+  box-shadow:0 4px 0 color-mix(in srgb, var(--accent) 60%, #000); transition:transform .06s, box-shadow .06s;
+}
+#whipBtn:active, #whipBtn.down{transform:translateY(3px); box-shadow:0 1px 0 color-mix(in srgb, var(--accent) 60%, #000)}
+#whipBtn:focus-visible{outline:3px solid var(--fg); outline-offset:3px}
+#whipBtn kbd{font-family:var(--f-mono); font-size:12px; letter-spacing:.08em; opacity:.85; border:1px solid currentColor; border-radius:5px; padding:1px 7px; justify-self:center}
+
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px 18px}
+.field{display:grid; gap:6px; align-content:start; min-width:0}
+.lab{font-size:12px; color:var(--muted); letter-spacing:.06em; display:flex; justify-content:space-between}
+.lab output{font-family:var(--f-mono); color:var(--fg); font-variant-numeric:tabular-nums}
+input[type=range]{width:100%; accent-color:var(--accent)}
+.seg{display:flex; gap:3px; padding:3px; background:var(--chip); border-radius:9px; position:relative}
+.seg input, .sw input{position:absolute; opacity:0; width:1px; height:1px; pointer-events:none}
+.seg label{flex:1; text-align:center; padding:5px 6px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--muted); white-space:nowrap}
+.seg input:checked + label{background:var(--surface); color:var(--fg); box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.seg input:focus-visible + label, .sw input:focus-visible + label{outline:2px solid var(--accent); outline-offset:1px}
+.sw{display:flex; gap:10px; position:relative}
+.sw label{width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid var(--surface); box-shadow:0 0 0 1px var(--line)}
+.sw input:checked + label{box-shadow:0 0 0 2px var(--fg)}
+.toggles{display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center}
+.toggles label{display:flex; gap:7px; align-items:center; cursor:pointer; font-size:14px}
+.toggles input{accent-color:var(--accent); width:17px; height:17px}
+#reset{font:inherit; font-size:13px; color:var(--fg); background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:5px 12px; cursor:pointer}
+#reset:focus-visible{outline:2px solid var(--accent)}
+.tip{margin:0; color:var(--muted); font-size:13px; max-width:75ch}
+.tip b{color:var(--fg); font-weight:500}
+
+@media (max-width:640px){
+  h1{font-size:34px}
+  .deck{grid-template-columns:1fr}
+  #whipBtn{min-height:70px; font-size:28px; grid-auto-flow:column; align-items:center; gap:12px}
+}
+@media (max-width:520px){
+  .hud{grid-template-columns:repeat(2,1fr)}
+  .stat .v{font-size:21px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>鹈鹕<span>快鞭</span></h1>
+    <p>这只鹈鹕骑车从来不蹬，全靠抽。踩准节奏连续挥鞭，速度会越叠越快。</p>
+  </header>
+
+  <div class="hud" aria-live="off">
+    <div class="stat hot"><span class="k">时速</span><span class="v"><span id="hv">0.0</span><small>km/h</small></span></div>
+    <div class="stat"><span class="k">里程</span><span class="v"><span id="hd">0</span><small>m</small></span></div>
+    <div class="stat"><span class="k">连击</span><span class="v"><span id="hc">×0</span></span></div>
+    <div class="stat"><span class="k">历史最高时速</span><span class="v"><span id="hb">0.0</span><small>km/h</small></span></div>
+  </div>
+
+  <div class="stage"><canvas id="scene" aria-label="鹈鹕挥鞭骑自行车的动画，点击画面挥鞭"></canvas></div>
+
+  <div class="deck">
+    <button id="whipBtn" type="button">挥鞭！<kbd>空格</kbd></button>
+    <div class="panel">
+      <div class="field">
+        <span class="lab"><span>鞭力</span><output id="powerOut">6</output></span>
+        <input id="power" type="range" min="1" max="10" step="1" value="6" aria-label="鞭力">
+      </div>
+      <div class="field">
+        <span class="lab">路面</span>
+        <div class="seg" role="radiogroup" aria-label="路面">
+          <input type="radio" name="road" id="road-asphalt" value="asphalt" checked><label for="road-asphalt">柏油路</label>
+          <input type="radio" name="road" id="road-sand" value="sand"><label for="road-sand">沙地</label>
+          <input type="radio" name="road" id="road-ice" value="ice"><label for="road-ice">冰面</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">时段</span>
+        <div class="seg" role="radiogroup" aria-label="时段">
+          <input type="radio" name="scene" id="scene-day" value="day" checked><label for="scene-day">白天</label>
+          <input type="radio" name="scene" id="scene-dusk" value="dusk"><label for="scene-dusk">黄昏</label>
+          <input type="radio" name="scene" id="scene-night" value="night"><label for="scene-night">夜晚</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">车身颜色</span>
+        <div class="sw" role="radiogroup" aria-label="车身颜色">
+          <input type="radio" name="bike" id="bike-red" value="#d6283b" checked><label for="bike-red" style="background:#d6283b" title="红"></label>
+          <input type="radio" name="bike" id="bike-blue" value="#1f6fd1"><label for="bike-blue" style="background:#1f6fd1" title="蓝"></label>
+          <input type="radio" name="bike" id="bike-green" value="#249468"><label for="bike-green" style="background:#249468" title="绿"></label>
+          <input type="radio" name="bike" id="bike-yellow" value="#e8b11c"><label for="bike-yellow" style="background:#e8b11c" title="黄"></label>
+          <input type="radio" name="bike" id="bike-black" value="#2b3138"><label for="bike-black" style="background:#2b3138" title="黑"></label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">选项</span>
+        <div class="toggles">
+          <label><input type="checkbox" id="auto">自动挥鞭</label>
+          <label><input type="checkbox" id="sound" checked>音效</label>
+          <button id="reset" type="button">重新出发</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="tip"><b>玩法：</b>点击画面、按空格键或点「挥鞭」按钮。左上角是节奏条，在绿色区间（上一鞭后 0.5 到 1.2 秒）内挥鞭能叠连击，每层多 20% 加速，最高 ×2；挥得太急只有四成力。沙地阻力大，冰面几乎不减速。</p>
+</div>
+
+<script>
+(() => {
+const W = 800, H = 450, GY = 390, OX = 120, PPM = 60, R = 58;
+const WD = 0.42, CRACK = 0.22;
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cv = document.getElementById('scene');
+const ctx = cv.getContext('2d');
+let scale = 1;
+
+function fit() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cv.clientWidth || 800;
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(w * 9 / 16 * dpr);
+  scale = cv.width / W;
+}
+if ('ResizeObserver' in window) new ResizeObserver(fit).observe(cv); else addEventListener('resize', fit);
+fit();
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('pelican.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('pelican.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const ROADS = {
+  asphalt: { roll: .30, k1: .05, k2: .012, ground: '#5d6368', top: '#45494d', dash: '#efe6c4', dust: [205, 205, 205] },
+  sand:    { roll: 1.0, k1: .15, k2: .020, ground: '#d8bd84', top: '#b7985a', dash: null,     dust: [229, 206, 158] },
+  ice:     { roll: .05, k1: .02, k2: .008, ground: '#cde8f2', top: '#97c6d8', dash: '#ffffff', dust: [255, 255, 255] }
+};
+const SCENES = {
+  day:   { sky: ['#8fcff5', '#e3f4ff'], far: '#9fc9a2', near: '#7db47e', cloud: 'rgba(255,255,255,.95)', orb: '#ffe27a', orbXY: [660, 82, 34] },
+  dusk:  { sky: ['#ef8a62', '#ffd59c'], far: '#a07a98', near: '#7c5d84', cloud: 'rgba(255,214,192,.9)', orb: '#ff7a45', orbXY: [610, 250, 50] },
+  night: { sky: ['#0c1a32', '#2a3d63'], far: '#22344c', near: '#18273a', cloud: 'rgba(70,90,128,.75)', orb: '#f2efd6', orbXY: [650, 80, 26] }
+};
+
+const S = {
+  v: 5, dist: 0, maxV: 0, best: +store.get('best', 0) || 0,
+  combo: 0, lastWhip: -9, whipT: -1, pending: null,
+  power: store.get('power', 6), road: store.get('road', 'asphalt'), scene: store.get('scene', 'day'),
+  bike: store.get('bike', '#d6283b'), sound: store.get('sound', true), auto: false,
+  time: 0, shake: 0, parts: [], pops: [], started: false, lastSave: 0
+};
+if (!ROADS[S.road]) S.road = 'asphalt';
+if (!SCENES[S.scene]) S.scene = 'day';
+
+// ---------- shapes (bike-space coordinates, same as the SVG) ----------
+const P = s => new Path2D(s);
+const tailP = P('M215 180 L178 172 L186 190 L176 204 L218 202 Z');
+const frontWingP = P('M286 176 Q330 178 370 196 Q340 206 296 198 Z');
+const crestP = P('M306 84 Q300 70 312 72 Q306 80 316 82');
+const billP = P('M330 93 L448 112 Q452 116 446 118 L334 108 Z');
+const billTipP = P('M446 112 Q458 116 448 122');
+const wingP = P('M244 168 Q220 120 196 96 Q210 98 214 106 Q216 96 226 102 Q228 112 234 112 Q250 140 262 166 Z');
+const wingLinesP = P('M232 150 L214 118 M242 156 L226 124');
+const seatP = P('M238 224 Q262 214 282 222 L280 230 Q260 228 240 232 Z');
+const frameP = P('M170 330 L290 335 L262 232 Z M262 232 L402 228 L290 335 M402 228 L430 330');
+const barP = P('M402 228 L398 200 Q392 192 372 196');
+const neckP = P('M298 168 Q318 140 312 112');
+const neckLinesP = P('M288 166 Q306 140 302 114 M308 170 Q328 142 322 112');
+const footP = P('M-12 0 L14 0 L6 -8 L0 -2 L-4 -10 Z');
+
+const rot = (x, y, cx, cy, a) => {
+  const c = Math.cos(a), s = Math.sin(a), dx = x - cx, dy = y - cy;
+  return { x: cx + dx * c - dy * s, y: cy + dx * s + dy * c };
+};
+const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerpP = (p, q, t) => ({ x: lerp(p.x, q.x, t), y: lerp(p.y, q.y, t) });
+
+// stars & clouds
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const stars = Array.from({ length: 70 }, () => ({ x: rnd() * W, y: rnd() * 260, r: rnd() * 1.4 + .3, p: rnd() * 6 }));
+const clouds = [{ x: 80, y: 72, s: 1 }, { x: 430, y: 48, s: .7 }, { x: 760, y: 115, s: .9 }, { x: 1060, y: 64, s: 1.2 }];
+
+// ---------- audio ----------
+let actx = null;
+function audio() {
+  if (!S.sound) return null;
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; }
+  return actx;
+}
+function crackSound(strength) {
+  const a = audio(); if (!a) return;
+  try {
+    const len = Math.floor(a.sampleRate * .14), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 6);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+    const g = a.createGain(); g.gain.value = .35 + strength * .05;
+    src.connect(hp).connect(g).connect(a.destination); src.start();
+  } catch (e) {}
+}
+
+// ---------- game logic ----------
+function whip() {
+  if (S.whipT >= 0 && S.whipT < .3) return;
+  audio();
+  S.started = true;
+  const since = S.time - S.lastWhip;
+  S.lastWhip = S.time;
+  const base = .32 * S.power;
+  let mult, label, color = '#ff6a26';
+  if (since < .5) { S.combo = 0; mult = .4; label = '太急！'; color = '#ff4d4d'; }
+  else if (since <= 1.2) { S.combo++; mult = 1 + .2 * Math.min(S.combo - 1, 5); label = S.combo >= 2 ? '节奏 ×' + S.combo : '啪！'; if (S.combo >= 2) color = '#38d17a'; }
+  else { S.combo = 1; mult = 1; label = '啪！'; }
+  S.pending = { boost: base * mult, label, color };
+  S.whipT = 0;
+  const b = document.getElementById('whipBtn'); b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 90);
+}
+function crack() {
+  const p = S.pending || { boost: 1, label: '啪！', color: '#ff6a26' };
+  S.v = Math.min(30, S.v + p.boost);
+  const sx = OX + 142, sy = 268;
+  for (let i = 0; i < 12; i++) {
+    const a = rnd() * Math.PI * 2, sp = 120 + rnd() * 220;
+    S.parts.push({ t: 'spark', x: sx, y: sy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: .28, max: .28 });
+  }
+  S.pops.push({ text: p.label, x: sx - 40, y: sy - 30, life: .9, max: .9, color: p.color });
+  if (!RM) S.shake = 4 + S.power * .5;
+  crackSound(S.power);
+  S.pending = null;
+}
+function reset() {
+  S.v = 4; S.dist = 0; S.combo = 0; S.parts = []; S.pops = []; S.maxV = 0; S.lastWhip = -9; S.whipT = -1;
+}
+
+function update(dt) {
+  S.time += dt;
+  if (S.whipT >= 0) {
+    const prev = S.whipT; S.whipT += dt;
+    if (prev < CRACK && S.whipT >= CRACK) crack();
+    if (S.whipT >= WD) S.whipT = -1;
+  }
+  if (S.auto && S.time - S.lastWhip >= .85) whip();
+  if (S.combo && S.time - S.lastWhip > 1.6) S.combo = 0;
+
+  const r = ROADS[S.road];
+  const decay = (S.v > 0 ? r.roll : 0) + r.k1 * S.v + r.k2 * S.v * S.v;
+  S.v = Math.max(0, S.v - decay * dt);
+  if (S.v < .02) S.v = 0;
+  S.dist += S.v * dt;
+  S.maxV = Math.max(S.maxV, S.v);
+  if (S.v * 3.6 > S.best) S.best = S.v * 3.6;
+  if (S.time - S.lastSave > 2) { store.set('best', +S.best.toFixed(1)); S.lastSave = S.time; }
+
+  // dust
+  const n = S.v * dt * (S.road === 'sand' ? 7 : 3.5);
+  for (let i = 0; i < Math.floor(n) + (rnd() < n % 1 ? 1 : 0); i++) {
+    S.parts.push({ t: 'dust', x: OX + 150 + rnd() * 20, y: GY - 3, vx: -S.v * PPM * .25 - rnd() * 40, vy: -15 - rnd() * 35,
+      life: .6 + rnd() * .5, max: 1.1, s: 3 + rnd() * 4 });
+  }
+  for (const p of S.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.t === 'spark') { p.vx *= .9; p.vy *= .9; } }
+  S.parts = S.parts.filter(p => p.life > 0);
+  for (const p of S.pops) { p.y -= 40 * dt; p.life -= dt; }
+  S.pops = S.pops.filter(p => p.life > 0);
+  S.shake *= Math.exp(-dt * 14);
+}
+
+// ---------- drawing ----------
+function drawBg(scroll) {
+  const sc = SCENES[S.scene];
+  const g = ctx.createLinearGradient(0, 0, 0, GY);
+  g.addColorStop(0, sc.sky[0]); g.addColorStop(1, sc.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, GY);
+  if (S.scene === 'night') {
+    for (const s of stars) {
+      ctx.globalAlpha = .55 + .45 * Math.sin(S.time * 2 + s.p);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  const [ox, oy, orr] = sc.orbXY;
+  ctx.fillStyle = sc.orb; ctx.beginPath(); ctx.arc(ox, oy, orr, 0, 7); ctx.fill();
+  if (S.scene === 'night') { ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.beginPath(); ctx.arc(ox - 8, oy - 5, 6, 0, 7); ctx.arc(ox + 9, oy + 7, 4, 0, 7); ctx.fill(); }
+
+  ctx.fillStyle = sc.cloud;
+  for (const c of clouds) {
+    const x = ((c.x - scroll * .05 - S.time * 8) % 1300 + 1300) % 1300 - 200;
+    ctx.beginPath();
+    ctx.arc(x, c.y, 22 * c.s, 0, 7); ctx.arc(x + 26 * c.s, c.y - 10 * c.s, 26 * c.s, 0, 7); ctx.arc(x + 54 * c.s, c.y, 20 * c.s, 0, 7);
+    ctx.rect(x, c.y, 54 * c.s, 20 * c.s * .9);
+    ctx.fill();
+  }
+  hills(scroll * .12, 292, 24, .006, sc.far);
+  hills(scroll * .32, 340, 16, .011, sc.near);
+
+  const r = ROADS[S.road];
+  ctx.fillStyle = r.ground; ctx.fillRect(0, GY, W, H - GY);
+  ctx.fillStyle = r.top; ctx.fillRect(0, GY - 2, W, 5);
+  const off = -(scroll % 90);
+  if (r.dash) {
+    ctx.fillStyle = r.dash;
+    for (let x = off; x < W; x += 90) ctx.fillRect(x, 422, 46, 5);
+  } else {
+    ctx.strokeStyle = 'rgba(150,118,62,.45)'; ctx.lineWidth = 2;
+    for (let x = off; x < W + 90; x += 90) { ctx.beginPath(); ctx.moveTo(x, 418); ctx.quadraticCurveTo(x + 22, 410, x + 44, 418); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x + 30, 436); ctx.quadraticCurveTo(x + 52, 428, x + 74, 436); ctx.stroke(); }
+  }
+  // distance posts every 25 m
+  const anchor = OX + 290, first = Math.ceil((S.dist - (anchor + 80) / PPM) / 25) * 25;
+  ctx.font = '600 13px "IBM Plex Mono", ui-monospace, monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let m = Math.max(0, first); ; m += 25) {
+    const x = anchor + (m - S.dist) * PPM;
+    if (x > W + 60) break;
+    ctx.fillStyle = '#6b5530'; ctx.fillRect(x - 2, GY - 52, 4, 54);
+    ctx.fillStyle = '#fff6dc'; ctx.strokeStyle = '#6b5530'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - 30, GY - 74, 60, 24, 4) : ctx.rect(x - 30, GY - 74, 60, 24); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3a2c14'; ctx.fillText(m + ' m', x, GY - 61);
+  }
+}
+function hills(off, base, amp, f, color) {
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, GY);
+  for (let x = 0; x <= W; x += 8) {
+    const u = x + off;
+    ctx.lineTo(x, base + Math.sin(u * f) * amp + Math.sin(u * f * 2.3 + 1) * amp * .4);
+  }
+  ctx.lineTo(W, GY); ctx.closePath(); ctx.fill();
+}
+
+function wheel(cx, cy, a, spin) {
+  const blur = Math.min(1, spin / 22);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+  ctx.strokeStyle = `rgba(150,160,168,${1 - blur * .75})`; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const t = i * Math.PI / 8; ctx.moveTo(-Math.cos(t) * 54, -Math.sin(t) * 54); ctx.lineTo(Math.cos(t) * 54, Math.sin(t) * 54); }
+  ctx.stroke();
+  ctx.fillStyle = '#e5821a'; ctx.beginPath(); ctx.arc(0, -52, 3, 0, 7); ctx.fill();
+  ctx.restore();
+  if (blur > .15) { ctx.fillStyle = `rgba(165,175,182,${blur * .28})`; ctx.beginPath(); ctx.arc(cx, cy, 52, 0, 7); ctx.fill(); }
+  ctx.lineWidth = 8; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.arc(cx, cy, 58, 0, 7); ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeStyle = '#555'; ctx.beginPath(); ctx.arc(cx, cy, 52, 0, 7); ctx.stroke();
+  ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.fill();
+}
+function leg(hx, hy, px, py, color) {
+  const L1 = 82, L2 = 82;
+  const dx = px - hx, dy = py - hy;
+  const d = Math.min(Math.hypot(dx, dy), L1 + L2 - .5);
+  const a = Math.atan2(dy, dx);
+  const th = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+  const kx = hx + Math.cos(a - th) * L1, ky = hy + Math.sin(a - th) * L1;
+  ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(px, py); ctx.stroke();
+  ctx.save(); ctx.translate(px, py - 3); ctx.fillStyle = color; ctx.fill(footP); ctx.restore();
+}
+function crank(c, near) {
+  const bx = 290, by = 335, L = 34;
+  const p = { x: bx + Math.cos(c) * L, y: by + Math.sin(c) * L };
+  ctx.strokeStyle = near ? '#333' : '#555'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(p.x, p.y); ctx.stroke();
+  ctx.fillStyle = near ? '#222' : '#444'; ctx.fillRect(p.x - 12, p.y - 3, 24, 7);
+  return p;
+}
+function whipPose() {
+  if (S.whipT < 0) return { wa: 0, ph: 'idle', u: 0 };
+  const p = S.whipT / WD;
+  if (p < .4) { const u = ease(p / .4); return { wa: .35 * u, ph: 'up', u }; }
+  if (p < .55) { const u = ease((p - .4) / .15); return { wa: .35 - .8 * u, ph: 'snap', u }; }
+  const u = ease((p - .55) / .45); return { wa: -.45 * (1 - u), ph: 'back', u };
+}
+
+function drawRider() {
+  const v = S.v, sv = Math.min(v, 15), t = S.time;
+  const wheelA = S.dist * PPM / R, spin = v * PPM / R;
+  const ca = wheelA / 2.2;
+  const bob = Math.sin(ca * 2) * 1.6 * Math.min(v / 5, 1);
+  const lean = .09 * Math.min(v / 12, 1);
+  const toBike = (x, y) => rot(x, y + bob, 262, 225, lean);
+
+  wheel(170, 330, wheelA, spin);
+  wheel(430, 330, wheelA, spin);
+
+  // far crank + far leg (behind frame)
+  const pf = crank(ca + Math.PI, false);
+  leg(268, 214 + bob, pf.x, pf.y, '#cf6f17');
+
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(170, 326); ctx.lineTo(290, 320); ctx.moveTo(170, 334); ctx.lineTo(290, 350); ctx.stroke();
+  ctx.strokeStyle = S.bike; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(frameP);
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 7; ctx.stroke(barP);
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(362, 190, 18, 11, 5) : ctx.rect(362, 190, 18, 11); ctx.fill();
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(262, 232); ctx.lineTo(262, 224); ctx.stroke();
+  ctx.fillStyle = '#222'; ctx.fill(seatP);
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(290, 335, 15, 0, 7); ctx.stroke();
+
+  const pn = crank(ca, true);
+  leg(288, 212 + bob, pn.x, pn.y, '#f08a24');
+
+  // upper body
+  const pose = whipPose();
+  ctx.save();
+  ctx.translate(262, 225); ctx.rotate(lean); ctx.translate(-262, -225 + bob);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#dfe3e6'; ctx.strokeStyle = '#8b949b'; ctx.lineWidth = 2;
+  ctx.save(); ctx.translate(215, 190); ctx.rotate(Math.sin(t * 9) * .04 * Math.min(v / 6, 1)); ctx.translate(-215, -190); ctx.fill(tailP); ctx.stroke(tailP); ctx.restore();
+  ctx.fillStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(262, 188, 58, 38, -12 * Math.PI / 180, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c8ced3'; ctx.beginPath(); ctx.moveTo(232, 196); ctx.quadraticCurveTo(262, 212, 300, 196); ctx.stroke();
+  ctx.fillStyle = '#e9edf0'; ctx.strokeStyle = '#8b949b'; ctx.lineWidth = 2.5; ctx.fill(frontWingP); ctx.stroke(frontWingP);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 22; ctx.stroke(neckP);
+  ctx.strokeStyle = '#8b949b'; ctx.lineWidth = 2.5; ctx.stroke(neckLinesP);
+  ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(318, 100, 20, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.translate(310, 84); ctx.rotate(-Math.min(v / 15, 1) * .5 + Math.sin(t * 14) * .05 * Math.min(v / 8, 1)); ctx.translate(-310, -84);
+  ctx.fillStyle = '#f1e2a6'; ctx.lineWidth = 1.5; ctx.fill(crestP); ctx.stroke(crestP); ctx.restore();
+  // bill + flapping pouch
+  const g = ctx.createLinearGradient(330, 0, 450, 0); g.addColorStop(0, '#f7a531'); g.addColorStop(1, '#f4c542');
+  ctx.fillStyle = g; ctx.strokeStyle = '#b86d10'; ctx.lineWidth = 2; ctx.fill(billP); ctx.stroke(billP);
+  const w = Math.sin(t * 18) * sv * .45;
+  const pouch = P(`M334 108 L446 118 Q420 ${158 + w} 372 ${150 + w * .6} Q342 140 334 108 Z`);
+  ctx.fillStyle = '#f2b04a'; ctx.fill(pouch); ctx.stroke(pouch);
+  ctx.fillStyle = '#d9531e'; ctx.fill(billTipP);
+  // eye + brow
+  if ((t % 3.7) < .12) { ctx.strokeStyle = '#111'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(319, 96); ctx.lineTo(329, 96); ctx.stroke(); }
+  else { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(324, 96, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(325.5, 94.5, 1.5, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(314, 86 - Math.min(S.combo, 5)); ctx.lineTo(333, 90); ctx.stroke();
+  // whipping wing + handle
+  ctx.save(); ctx.translate(250, 168); ctx.rotate(pose.wa); ctx.translate(-250, -168);
+  ctx.fillStyle = '#e9edf0'; ctx.strokeStyle = '#8b949b'; ctx.lineWidth = 2.5; ctx.fill(wingP); ctx.stroke(wingP);
+  ctx.strokeStyle = '#a9b2b9'; ctx.lineWidth = 2; ctx.stroke(wingLinesP);
+  ctx.strokeStyle = '#6b3f1d'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(204, 104); ctx.lineTo(176, 72); ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+
+  // lash (bike space)
+  const hb = rot(204, 104, 250, 168, pose.wa), ht0 = rot(176, 72, 250, 168, pose.wa);
+  const h0 = toBike(hb.x, hb.y), ht = toBike(ht0.x, ht0.y);
+  const hl = Math.hypot(ht.x - h0.x, ht.y - h0.y), hd = { x: (ht.x - h0.x) / hl, y: (ht.y - h0.y) / hl };
+  const idle = { x: ht.x - 60 - sv * 4 + Math.sin(t * 6) * 4, y: ht.y + 100 - sv * 3 + Math.cos(t * 5) * 3 };
+  const up = { x: ht.x + 50, y: ht.y - 60 };
+  const strike = { x: 142, y: 268 };
+  let tip;
+  if (pose.ph === 'idle') tip = idle;
+  else if (pose.ph === 'up') tip = lerpP(idle, up, pose.u);
+  else if (pose.ph === 'snap') tip = lerpP(up, strike, pose.u);
+  else tip = lerpP(strike, idle, pose.u);
+  const c1 = { x: ht.x + hd.x * 70, y: ht.y + hd.y * 70 };
+  const c2 = { x: tip.x - 30, y: tip.y - 60 };
+  ctx.strokeStyle = '#3b2414'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ht.x, ht.y); ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tip.x, tip.y); ctx.stroke();
+  if (pose.ph === 'snap' || (pose.ph === 'up' && pose.u > .5)) {
+    ctx.strokeStyle = 'rgba(122,143,163,.7)'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.moveTo(ht.x - 10, ht.y - 30); ctx.quadraticCurveTo(ht.x - 60, ht.y - 40, ht.x - 80, ht.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawFx() {
+  for (const p of S.parts) {
+    const a = Math.max(0, p.life / p.max);
+    if (p.t === 'dust') {
+      const c = ROADS[S.road].dust;
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a * .7})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.s * (1.8 - a), 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = `rgba(255,96,30,${a})`; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .05, p.y - p.vy * .05); ctx.stroke();
+    }
+  }
+  if (!RM && S.v > 9) {
+    const al = Math.min(.6, (S.v - 9) / 14);
+    ctx.strokeStyle = `rgba(255,255,255,${al})`; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const y = 60 + ((i * 97) % 300);
+      const x = W + 200 - ((S.time * (900 + S.v * 40) + i * 233) % (W + 400));
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 60 + S.v * 3, y); ctx.stroke();
+    }
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of S.pops) {
+    const a = Math.min(1, p.life / p.max * 2);
+    ctx.globalAlpha = a;
+    ctx.font = '32px "ZCOOL KuaiLe", "Noto Sans SC", sans-serif';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(40,16,0,.85)'; ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function rrect(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+function drawMeter() {
+  const x = 14, y = 14, w = 232, bw = 200, span = 1.6;
+  ctx.fillStyle = 'rgba(15,22,28,.55)'; rrect(x, y, w, 46, 10); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '500 12px "Noto Sans SC", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('节奏', x + 12, y + 14);
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.fillText(S.auto ? '自动' : '鞭力 ' + S.power, x + w - 12, y + 14);
+  const bx = x + 16, by = y + 26;
+  ctx.fillStyle = 'rgba(255,90,70,.75)'; ctx.fillRect(bx, by, bw * .5 / span, 9);
+  ctx.fillStyle = 'rgba(56,209,122,.9)'; ctx.fillRect(bx + bw * .5 / span, by, bw * .7 / span, 9);
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(bx + bw * 1.2 / span, by, bw * .4 / span, 9);
+  const since = Math.min(span, S.time - S.lastWhip);
+  ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * since / span - 1.5, by - 4, 3, 17);
+}
+function drawHint() {
+  if (S.started) return;
+  const a = .75 + .25 * Math.sin(S.time * 4);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(15,22,28,.6)'; rrect(W / 2 - 150, 22, 300, 40, 20); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '500 16px "Noto Sans SC", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('点击画面或按空格键挥鞭', W / 2, 42);
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const sh = S.shake;
+  ctx.save();
+  if (sh > .2) ctx.translate((Math.random() - .5) * sh, (Math.random() - .5) * sh);
+  drawBg(S.dist * PPM);
+  ctx.save(); ctx.translate(OX, 0); drawRider(); ctx.restore();
+  drawFx();
+  ctx.restore();
+  drawMeter();
+  drawHint();
+}
+
+// ---------- HUD ----------
+const hv = document.getElementById('hv'), hd = document.getElementById('hd'), hc = document.getElementById('hc'), hbst = document.getElementById('hb');
+function hud() {
+  hv.textContent = (S.v * 3.6).toFixed(1);
+  hd.textContent = Math.floor(S.dist).toLocaleString('zh-CN');
+  hc.textContent = '×' + S.combo;
+  hbst.textContent = S.best.toFixed(1);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  update(dt); draw(); hud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- controls ----------
+cv.addEventListener('pointerdown', e => { e.preventDefault(); whip(); });
+document.getElementById('whipBtn').addEventListener('click', whip);
+addEventListener('keydown', e => {
+  if ((e.code === 'Space' || e.code === 'ArrowUp') && !e.repeat && !e.target.closest('input,select,textarea,button')) { e.preventDefault(); whip(); }
+});
+const power = document.getElementById('power'), powerOut = document.getElementById('powerOut');
+power.value = S.power; powerOut.textContent = S.power;
+power.addEventListener('input', () => { S.power = +power.value; powerOut.textContent = S.power; store.set('power', S.power); });
+function bindRadio(name, key) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+    el.checked = el.value === S[key];
+    el.addEventListener('change', () => { if (el.checked) { S[key] = el.value; store.set(key, el.value); } });
+  });
+}
+bindRadio('road', 'road'); bindRadio('scene', 'scene'); bindRadio('bike', 'bike');
+const auto = document.getElementById('auto'), sound = document.getElementById('sound');
+sound.checked = !!S.sound;
+auto.addEventListener('change', () => { S.auto = auto.checked; if (S.auto) S.started = true; });
+sound.addEventListener('change', () => { S.sound = sound.checked; store.set('sound', S.sound); if (S.sound) audio(); });
+document.getElementById('reset').addEventListener('click', reset);
+})();
+</script>
+
+</body>
+</html>
